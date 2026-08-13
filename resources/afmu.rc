@@ -1,0 +1,72 @@
+// Windows resource script: the executable's icon and version block.
+//
+// NOTE: this is the one file in the project whose comments are in English.
+// rc.exe reads its input in the system ANSI code page and there is no portable
+// way to tell it otherwise (/c65001 is MSVC-only, and a UTF-8 BOM trips up
+// windres). With Chinese comments on a CP936 machine the preprocessor swallows
+// line breaks and #ifdef/#endif stop matching -- fatal error C1020, from a
+// comment. Not worth it for a 40-line file.
+//
+// Why the icon has to live here rather than only in QGuiApplication::setWindowIcon:
+// Explorer, the taskbar's pinned entries and the Start menu show the icon of the
+// *file*, which the linker embeds from this script -- it has to be there before
+// the process ever starts. Resource ID 1 matters too: the shell picks the icon
+// group with the lowest ID.
+//
+// The version block is not decoration either. Without it the Properties dialog
+// is blank, and antivirus/SmartScreen heuristics are harsher on unsigned
+// executables that carry no version information.
+
+#include <windows.h>
+
+1 ICON "afmu.ico"
+
+// Application manifest (PerMonitorV2 DPI awareness, supportedOS, UTF-8 active
+// code page -- see afmu.manifest). Embedded from here ONLY under MinGW.
+//
+// Under MSVC the linker does it: CMake turns afmu.manifest into /MANIFESTINPUT
+// and merges it with its own default manifest. Doing both would put two
+// RT_MANIFEST resources with ID 1 into the exe, and cvtres fails the link with
+// CVT1100 "duplicate resource".
+//
+// Literal numbers rather than CREATEPROCESS_MANIFEST_RESOURCE_ID / RT_MANIFEST:
+// the latter is MAKEINTRESOURCE(24) in winuser.h, which is not a valid type
+// token in a resource script. 1 is the manifest ID for an exe, 24 is RT_MANIFEST.
+#ifdef AFMU_RC_EMBED_MANIFEST
+1 24 "afmu.manifest"
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+FILEFLAGS       VS_FF_DEBUG
+#else
+FILEFLAGS       0x0L
+#endif
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        // 040904B0 = English (US) + Unicode. This block only declares the code
+        // page of the strings below; it does not restrict what they contain.
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      "aynux"
+            VALUE "FileDescription",  "FileBridge - AFMU file transfer client"
+            VALUE "FileVersion",      "1.0.0.0"
+            VALUE "InternalName",     "afmu"
+            VALUE "LegalCopyright",   "aynux"
+            VALUE "OriginalFilename", "afmu.exe"
+            VALUE "ProductName",      "FileBridge"
+            VALUE "ProductVersion",   "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

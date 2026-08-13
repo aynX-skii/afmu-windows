@@ -1,0 +1,42 @@
+# CMake 构建目录
+build/
+build-*/
+cmake-build-*/
+out/
+
+# cmake --install 的产物。**别提交这个** —— windeployqt 会往里拷一整套 Qt 运行时
+# 加 OpenSSL 的两个 DLL，还有 vc_redist.x64.exe，一共 100 MB 出头的第三方二进制。
+# 它是构建出来的东西，不是源码；进了 git 就永远在历史里了。
+dist/
+
+# Visual Studio / MSBuild
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.*
+*.pdb
+*.ilk
+*.exp
+*.obj
+
+# 编辑器 / 语言服务器
+.cache/
+.vscode/
+.idea/
+compile_commands.json
+.qmlls.ini
+*.user
+*.autosave
+CMakeLists.txt.user*
+
+# QML 缓存
+*.qmlc
+*.jsc
+
+# Python（tools/ 下的生成脚本）
+__pycache__/
+*.pyc
+
+*.swp
+.DS_Store
+Thumbs.db

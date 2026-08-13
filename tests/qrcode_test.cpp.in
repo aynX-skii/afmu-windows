@@ -1,0 +1,164 @@
+/**
+ * 二维码编码器的对照测试。
+ *
+ * afmu-linux 用的是 libqrencode，Windows 这边为了不引入一个「先装 vcpkg 再编一遍库」
+ * 的依赖，src/QrCode.cpp 是按 ISO/IEC 18004 自己写的。自己写就必须自证 ——
+ * 编码错了不会崩、不会报错，只会「有些二维码扫不出来」，而配对二维码扫不出来时
+ * 用户看到的是「对着扫没反应」，没人会想到是编码器的锅。
+ *
+ * 所以下面这 320 组向量不是自己生成的：它们来自 Python 的 segno（另一套独立实现），
+ * 40 个版本 × 4 个纠错级别 × {满容量, 满容量-1} 各一组，比对的是整张模块位图的
+ * SHA-256。数据用一个两边一模一样的 xorshift 生成，所以文件里只需要种子和长度。
+ *
+ * 生成脚本见 tools/gen_qr_vectors.py。掩码选择用 libqrencode 的口径（罚分在写入
+ * 格式信息之后算），比对时让 segno 用同一个掩码 —— 掩码选谁不影响能不能扫，
+ * 但固定下来才能逐位比。
+ *
+ *   cmake -S . -B build -DAFMU_TESTS=ON && cmake --build build
+ *   .\build\afmu_qrcode_test.exe
+ */
+
+#include "../src/QrCode.h"
+
+#include <QByteArray>
+#include <QCryptographicHash>
+
+#include <cstdint>
+#include <cstdio>
+
+namespace {
+
+int g_failed = 0;
+int g_passed = 0;
+
+void check(bool ok, const char *what)
+{
+    if (ok) {
+        ++g_passed;
+    } else {
+        ++g_failed;
+        std::fprintf(stderr, "  失败：%s\n", what);
+    }
+}
+
+/** 和生成脚本里逐位一致的 xorshift32。种子非零，序列就非零。 */
+QByteArray genData(std::uint32_t seed, int n)
+{
+    QByteArray out;
+    out.resize(n);
+    std::uint32_t s = seed;
+    for (int i = 0; i < n; ++i) {
+        s ^= s << 13;
+        s ^= s >> 17;
+        s ^= s << 5;
+        out[i] = char(s & 0xFF);
+    }
+    return out;
+}
+
+/** 位图的规范序列化：行优先，深色 '1' 浅色 '0'，再取 SHA-256 的前 16 字节。 */
+QByteArray digestOf(const afmu::QrCode &qr)
+{
+    QByteArray flat;
+    flat.reserve(qr.size() * qr.size());
+    for (int y = 0; y < qr.size(); ++y)
+        for (int x = 0; x < qr.size(); ++x)
+            flat.append(qr.module(x, y) ? '1' : '0');
+    return QCryptographicHash::hash(flat, QCryptographicHash::Sha256).left(16).toHex();
+}
+
+struct Vector
+{
+    int version;
+    int ecc; // 0=L 1=M 2=Q 3=H，和 QrCode::Ecc 同序
+    std::uint32_t seed;
+    int length;
+    const char *digest;
+};
+
+// ---- 以下由 tools/gen_qr_vectors.py 生成，别手改 ----
+const Vector kVectors[] = {
+@VECTORS@
+};
+
+/** 一个人眼可读的样本：b"afmu"，纠错 M。位图整个写出来，出问题时能直接看出错在哪。 */
+const char *kAfmuArt[] = {
+@ART@
+};
+// ---- 生成内容到此为止 ----
+
+} // namespace
+
+int main()
+{
+    std::fprintf(stderr, "== 对照 segno 的 %zu 组向量 ==\n",
+                 sizeof(kVectors) / sizeof(kVectors[0]));
+    int mismatch = 0;
+    for (const Vector &v : kVectors) {
+        const QByteArray data = genData(v.seed, v.length);
+        const afmu::QrCode qr = afmu::QrCode::encode(data, afmu::QrCode::Ecc(v.ecc));
+        if (!qr.isValid() || qr.version() != v.version || qr.size() != v.version * 4 + 17
+            || digestOf(qr) != QByteArray(v.digest)) {
+            if (++mismatch <= 10) {
+                std::fprintf(stderr, "  失败：版本 %d 级别 %d 长度 %d —— 得到 版本 %d 摘要 %s\n",
+                             v.version, v.ecc, v.length, qr.version(),
+                             digestOf(qr).constData());
+            }
+        }
+    }
+    check(mismatch == 0, "全部向量应当逐位一致");
+    if (mismatch == 0)
+        std::fprintf(stderr, "  %zu 组全部一致\n", sizeof(kVectors) / sizeof(kVectors[0]));
+
+    // ------------------------------------------------------------ 人眼可读的那一张
+    {
+        const afmu::QrCode qr =
+            afmu::QrCode::encode(QByteArrayLiteral("afmu"), afmu::QrCode::Ecc::Medium);
+        check(qr.isValid() && qr.version() == 1 && qr.size() == 21, "\"afmu\" 应当是版本 1");
+        bool same = qr.size() == 21;
+        for (int y = 0; y < qr.size() && same; ++y) {
+            for (int x = 0; x < qr.size(); ++x) {
+                if (qr.module(x, y) != (kAfmuArt[y][x] == '#')) {
+                    same = false;
+                    std::fprintf(stderr, "  第 %d 行不一致\n    期望 %s\n    实际 ", y,
+                                 kAfmuArt[y]);
+                    for (int i = 0; i < qr.size(); ++i)
+                        std::fputc(qr.module(i, y) ? '#' : '.', stderr);
+                    std::fputc('\n', stderr);
+                    break;
+                }
+            }
+        }
+        check(same, "\"afmu\" 的位图应当和参考图一致");
+    }
+
+    // ------------------------------------------------------------ 边界
+    {
+        check(!afmu::QrCode::encode(QByteArray(), afmu::QrCode::Ecc::Medium).isValid(),
+              "空数据应当返回无效对象而不是崩");
+        // 版本 40 的字节模式容量：L 2953 / M 2331 / Q 1663 / H 1273
+        const struct { afmu::QrCode::Ecc ecc; int cap; } caps[] = {
+            { afmu::QrCode::Ecc::Low, 2953 },
+            { afmu::QrCode::Ecc::Medium, 2331 },
+            { afmu::QrCode::Ecc::Quartile, 1663 },
+            { afmu::QrCode::Ecc::High, 1273 },
+        };
+        for (const auto &c : caps) {
+            const afmu::QrCode ok = afmu::QrCode::encode(QByteArray(c.cap, 'x'), c.ecc);
+            check(ok.isValid() && ok.version() == 40, "满容量应当编得出版本 40");
+            check(!afmu::QrCode::encode(QByteArray(c.cap + 1, 'x'), c.ecc).isValid(),
+                  "超一个字节就应当失败，不能悄悄截断");
+        }
+    }
+
+    // 越界读取要当成浅色 —— QrImage 画静区时直接带着负坐标循环
+    {
+        const afmu::QrCode qr =
+            afmu::QrCode::encode(QByteArrayLiteral("afmu"), afmu::QrCode::Ecc::Medium);
+        check(!qr.module(-1, 0) && !qr.module(0, -1) && !qr.module(21, 0) && !qr.module(0, 21),
+              "越界应当当成浅色");
+    }
+
+    std::fprintf(stderr, "\n通过 %d / 失败 %d\n", g_passed, g_failed);
+    return g_failed == 0 ? 0 : 1;
+}

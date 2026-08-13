@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  应用清单。两件事：
+
+  1. DPI 感知声明成 PerMonitorV2。不声明的话，把窗口从 100% 的显示器拖到 150% 的
+     显示器上，Windows 会把整个窗口位图放大 —— 结果是自绘的标题栏、图标、文字
+     全部糊掉。这个应用的界面全是自绘的，糊起来特别明显。
+  2. supportedOS 里列出 Windows 10/11 的 GUID。不列的话 GetVersionEx 之类的
+     兼容性垫片会把系统报成 Windows 8，Qt 的一些平台判断会走到旧分支上。
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity type="win32" name="aynux.FileBridge.afmu" version="1.0.0.0"/>
+  <description>FileBridge - AFMU file transfer client</description>
+
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 / 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+      <!-- Windows 8.1 -->
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"/>
+    </application>
+  </compatibility>
+
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+      <!-- 老系统只认这个键，两个都给 -->
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <!-- 进程内的窄字符 API 按 UTF-8 解释，路径里的中文不会因为 ANSI 代码页丢字 -->
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>

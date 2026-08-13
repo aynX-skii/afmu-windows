@@ -1,0 +1,18 @@
+# 仓库里一律存 LF，检出时由 core.autocrlf 决定给什么。
+#
+# 不显式声明的话，Windows 上开发的人提交进去的是 CRLF，Linux 上的人看到的每一行
+# 都带一个 ^M —— 而这个仓库的源文件和 afmu-linux 是逐行对照着看的，行尾一乱
+# diff 就全是噪音，改动本身反而看不见了。
+* text=auto eol=lf
+
+# 二进制：图标由 tools/gen_icon.py 生成，但生成物是要提交的
+*.ico binary
+*.png binary
+
+# Windows 的批处理必须是 CRLF，cmd.exe 对 LF 的多行结构（if/for 块）会解析出错
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 资源脚本走 rc.exe / windres，两种行尾都认，但和 .bat 放一起更省事
+*.rc       text eol=crlf
+*.manifest text eol=lf
