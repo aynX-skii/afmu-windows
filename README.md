@@ -3,7 +3,7 @@
 FileBridge 的 Windows 桌面客户端：Qt 6 + Qt Quick，暗黑扁平风，标题栏 / 边框 / 圆角 / 缩放
 全部自绘（`Qt.FramelessWindowHint` + `startSystemMove` / `startSystemResize`）。
 
-界面和协议实现照搬 [afmu-linux](../afmu-linux)，差异集中在平台相关的那几处，
+界面和协议实现照搬 [afmu-linux](https://github.com/aynX-skii/afmu-linux)，差异集中在平台相关的那几处，
 逐条列在下面的[「和 afmu-linux 的差异」](#和-afmu-linux-的差异)里。
 
 协议严格按 `AndroidFileManagerUtils/docs/PROTOCOL.md` 实现，v1 和 v2 都做了，
@@ -349,7 +349,7 @@ afmu.exe --accept-pairing       # 无头机器上接受一次配对请求，等�
   （套件当客户端，`afmu.exe` 当服务端），所以验到的是**服务端**这一半。
   客户端那一半 —— 尤其是 v2 配对走完之后的第一个真实请求（配对前后各清一次
   空闲连接池那件事）—— 只有代码和注释，没有对着真对端跑过。
-  afmu-linux 的 [README「已验证的行为」](../afmu-linux/README.md)那一节列的清单
+  afmu-linux 的 [README「已验证的行为」](https://github.com/aynX-skii/afmu-linux#已验证的行为)那一节列的清单
   同样适用于这里，跑之前**不要**默认它们已经通过。
 - Windows ↔ Android 的加密链路。Android 一侧已经真机实测（见 PROTOCOL.md §5.3），
   Linux ↔ Android 也跑通了，但**这不能推出 Windows ↔ Android 也通**。
