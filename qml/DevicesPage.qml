@@ -6,6 +6,11 @@ import Afmu
 Item {
     id: page
 
+    // 等用户确认的那一次「忘记」。见列表里的垃圾桶按钮。
+    property string pendingForgetHost: ""
+    property int pendingForgetPort: 0
+    property string pendingForgetName: ""
+
     // 把输入框里的 token 落进配置。
     //
     // 光靠 onEditingFinished 是不够的：本页的按钮全是 focusPolicy: Qt.NoFocus，
@@ -173,10 +178,16 @@ Item {
                     // 「已配对就藏起来」的按钮一直显示，锁图标也一直亮着 —— 界面对
                     // "这台设备配过没有"这个问题给出的答案是恒定的，而且是错的。
                     required property bool paired
+                    // 这次扫描真的听到它应答了吗。假 = 这一行是从配对表里列出来的，
+                    // 地址是上次见到它的那个。**必须显示出来**：本机分不清「设备关着」
+                    // 和「广播被吃掉了」，两种都表现为没应答，所以只能如实说「没应答」，
+                    // 不能让「列表里有它」被读成「它开着」。
+                    required property bool heard
 
                     width: list.width - (list.ScrollBar.vertical.visible ? 10 : 0)
                     height: 62
                     radius: Theme.radiusSm
+                    opacity: heard ? 1 : 0.62
                     color: itemMa.containsMouse ? Theme.hover : Theme.surfaceAlt
                     border.width: 1
                     border.color: App.connected && App.peerHost === host && App.peerPort === port
@@ -242,10 +253,23 @@ Item {
                                 }
                             }
                             Text {
-                                text: host + ":" + port + "  ·  " + os
+                                text: heard
+                                      ? host + ":" + port + "  ·  " + os
+                                      : host + ":" + port + "  ·  " + Tr.t("上次见到它的地址")
                                 font.pixelSize: Theme.fsXs
                                 color: Theme.textFaint
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
                             }
+                        }
+
+                        // 没应答的照样能点：广播走不通不等于 TCP 走不通 —— 恰恰是
+                        // 最常见的一种情况（Windows 防火墙默认拦入站 UDP，AP 隔离，
+                        // 手机息屏）。所以这里说的是"它没应答"，不是"它不可用"。
+                        StatBadge {
+                            visible: !heard
+                            label: Tr.t("未应答")
+                            tone: Theme.textFaint
                         }
 
                         StatBadge {
@@ -281,6 +305,33 @@ Item {
                             iconName: "link"
                             variant: FlatButton.Variant.Subtle
                             onClicked: page.connectTo(host, port, name, os)
+                        }
+
+                        IconButton {
+                            iconName: "trash"
+                            tip: Tr.t("忘记这台设备")
+                            activeColor: Theme.danger
+                            onClicked: {
+                                // 没配对过的那一行只是这一轮扫描的观察结果，删掉什么
+                                // 都不损失 —— 设备真在网上，下次扫描它自己会回来。
+                                // 为这种事弹个窗问一句，纯属挡路。
+                                if (!paired) {
+                                    App.forgetDevice(host, port)
+                                    return
+                                }
+                                // 配对过的完全是另一回事：配对表在 v2 里就是访问控制
+                                // 列表，删掉这条等于关掉一道门，而要再打开得两台设备
+                                // 都在手边重新配一次。这种事必须先问。
+                                page.pendingForgetHost = host
+                                page.pendingForgetPort = port
+                                page.pendingForgetName = name
+                                forgetDialog.open2(
+                                    Tr.t("忘记这台设备"),
+                                    Tr.t("这台设备已经配对过。忘记之后它无法再连接本机，")
+                                        + Tr.t("要用得两台设备都在手边重新配对一次。") + "\n\n"
+                                        + (name !== "" ? name + "\n" : "") + host + ":" + port,
+                                    true)
+                            }
                         }
                     }
                 }
@@ -350,5 +401,16 @@ Item {
     }
 
     PairDialog { id: pairDialog }
+
+    ConfirmDialog {
+        id: forgetDialog
+        confirmText: Tr.t("忘记")
+        onAccepted: {
+            App.forgetDevice(page.pendingForgetHost, page.pendingForgetPort)
+            page.pendingForgetHost = ""
+            page.pendingForgetPort = 0
+            page.pendingForgetName = ""
+        }
+    }
     AuthWaitDialog {}
 }

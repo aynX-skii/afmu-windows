@@ -254,6 +254,7 @@ if(AFMU_TESTS)
         src/Config.h     src/Config.cpp
         src/RollingId.h  src/RollingId.cpp
         src/Protocol.h   src/Protocol.cpp
+        src/Models.h     src/Models.cpp
     )
     # Protocol.cpp 用到 QHostAddress（Host 白名单那一段），所以多一个 Qt6::Network
     target_link_libraries(afmu_peerstore_test PRIVATE Qt6::Core Qt6::Network OpenSSL::Crypto)
